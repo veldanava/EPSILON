@@ -1,0 +1,79 @@
+import requests
+import argparse
+from threading import Thread, Lock
+from queue import Queue
+
+print("""
+\033[1;31m\033[1;37m
+   ▄████████    ▄███████▄    ▄████████  ▄█   ▄█        ▄██████▄  ███▄▄▄▄        
+  ███    ███   ███    ███   ███    ███ ███  ███       ███    ███ ███▀▀▀██▄      
+  ███    █▀    ███    ███   ███    █▀  ███▌ ███       ███    ███ ███   ███      
+ ▄███▄▄▄       ███    ███   ███        ███▌ ███       ███    ███ ███   ███      
+▀▀███▀▀▀     ▀█████████▀  ▀███████████ ███▌ ███       ███    ███ ███   ███      
+  ███    █▄    ███                 ███ ███  ███       ███    ███ ███   ███      
+  ███    ███   ███           ▄█    ███ ███  ███▌    ▄ ███    ███ ███   ███      
+  ██████████  ▄████▀       ▄████████▀  █▀   █████▄▄██  ▀██████▀   ▀█   █▀       
+                                            ▀                                   
+\033[1;31msubdomain finder                   coded by kiana\033[1;31m\033[1;37m""")
+print("")
+
+q = Queue()
+list = Lock()
+discover = []
+
+# exec target func
+def find(target):
+    global q
+    # cond
+    while True:
+        # get subdomain
+        subdomain = q.get()
+        url = f"http://{subdomain}.{target}"
+        # if error
+        try:
+            requests.get(url)
+        except requests.ConnectionError:
+            pass
+        else:
+            print(f"[XwX] an subdomain have been found >>", url)
+            with list:
+                # append
+                discover.append(url)
+        # done
+        q.task_done()
+
+# main func
+def main(target, n_threads, subdomains):
+    global q
+
+    # fill queue with the subdomain
+    for subdomain in subdomains:
+        q.put(subdomain)
+
+    for t in range(n_threads):
+        eps = Thread(target=find, args=(target,))
+        # daemon thread
+        eps.daemon = True
+        eps.start()
+
+# run
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="an subdomain finder, coded by kiana")
+    parser.add_argument("target", help="ur target domain")
+    parser.add_argument("-l", "--list", help="ur wordlist (default subs.txt)", default="subs.txt")
+    parser.add_argument("-t", "--num", help="the numbers of threads used (default is 10)", default=10, type=int)
+    parser.add_argument("-o", "--output", help="Specify the output text file to write discovered subdomains", default="discover.txt")
+    
+    args = parser.parse_args()
+    target = args.target
+    wordlist = args.list
+    th = args.num
+    out = args.output
+
+    main(target=target, n_threads=th, subdomains=open(wordlist).read().splitlines())
+    q.join()
+
+    # save the file
+    with open(out, "w") as f:
+        for url in discover:
+            print(url, file=f)
